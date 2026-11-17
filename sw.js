@@ -1,7 +1,7 @@
 // Service worker: offline support for Ace Computer Science.
 // Our own files are fetched network-first (so updates show up straight away) with a
 // cached fallback. Versioned CDN libraries (editor, Python, SQL) are cache-first.
-const CACHE = 'ace-cs-v1';
+const CACHE = 'ace-cs-v2';
 const ASSETS = [
   './', './index.html', './css/styles.css', './css/study.css', './manifest.json', './icon.svg', './icon-maskable.svg',
   './js/app.js', './js/study.js', './js/studydata.js', './js/curriculum.js', './js/runners.js', './js/worker.js',
@@ -20,7 +20,7 @@ self.addEventListener('activate', (event) => {
 });
 
 function store(req, res) {
-  if (res && (res.ok || res.type === 'opaque')) {
+  if (res && res.ok) {
     const copy = res.clone();
     caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
   }
@@ -36,6 +36,6 @@ self.addEventListener('fetch', (event) => {
       fetch(req).then((res) => store(req, res)).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
     );
   } else {
-    event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => store(req, res))));
+    event.respondWith(caches.match(req).then((hit) => (hit && hit.type !== 'opaque' ? hit : fetch(req).then((res) => store(req, res)))));
   }
 });
