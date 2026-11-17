@@ -1,0 +1,15 @@
+{
+  "name": "Ace Computer Science",
+  "short_name": "Ace CS",
+  "description": "Lessons, live coding labs, flashcards, practice tests and games for intro computer science.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#4f46e5",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "icon-maskable.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
+}

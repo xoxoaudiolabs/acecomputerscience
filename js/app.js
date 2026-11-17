@@ -22,7 +22,7 @@
 
   /* ---------- progress (saved in this browser) ---------- */
   const STORE_KEY = 'ace-cs-progress-v1';
-  let progress = { quiz: {}, labs: {}, playground: {} };
+  let progress = { quiz: {}, labs: {}, playground: {}, cards: {}, tests: [], game: { xp: 0, streak: 0, lastDay: null } };
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY));
     if (saved) progress = Object.assign(progress, saved);
@@ -30,6 +30,50 @@
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
   }
+  /* ---------- XP, levels and daily streak ---------- */
+  const dayKey = (d) => { d = d || new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  function levelInfo(xp) {
+    let level = 1;
+    for (let i = 1; i < XP_THRESHOLDS.length; i++) { if (xp >= XP_THRESHOLDS[i]) level = i + 1; else break; }
+    const cur = XP_THRESHOLDS[level - 1];
+    const next = level < XP_THRESHOLDS.length ? XP_THRESHOLDS[level] : null;
+    return { level, into: xp - cur, span: next ? next - cur : 0, max: next === null, total: xp };
+  }
+  function currentStreak() {
+    const g = progress.game;
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    return g.lastDay === dayKey() || g.lastDay === dayKey(y) ? g.streak : 0;
+  }
+  function toast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2600);
+  }
+  function addXp(amount) {
+    const g = progress.game;
+    const before = levelInfo(g.xp).level;
+    const today = dayKey();
+    if (g.lastDay !== today) {
+      g.streak = currentStreak() + 1;
+      g.lastDay = today;
+      if (g.streak > 1) toast(g.streak + ' day streak!');
+    }
+    g.xp += amount;
+    save();
+    const after = levelInfo(g.xp).level;
+    if (after > before) toast('Level up! You reached level ' + after);
+    renderLevel();
+  }
+  function renderLevel() {
+    const el = $('#levelBox');
+    if (!el) return;
+    const li = levelInfo(progress.game.xp);
+    el.innerHTML = '<div class="level-row"><b>Lv.' + li.level + '</b><span>' + (li.max ? li.total + ' XP' : li.into + '/' + li.span + ' XP') + '</span><span class="streak" title="Daily streak">🔥 ' + currentStreak() + '</span></div>' +
+      '<div class="bar xp"><i style="width:' + (li.max ? 100 : Math.round((li.into / li.span) * 100)) + '%"></i></div>';
+  }
+
   const labState = (id) => progress.labs[id] || (progress.labs[id] = { passed: false, attempts: 0 });
   const quizDone = (l) => l.quiz.every((_, i) => (progress.quiz[l.id] || [])[i]);
   const labDone = (l) => !!(progress.labs[l.lab.id] && progress.labs[l.lab.id].passed);
@@ -95,14 +139,15 @@
 
   /* ---------- sidebar ---------- */
   function renderSidebar(activeLessonId) {
-    const overall = pct(LESSONS);
     const route = location.hash || '#/';
+    const link = (hash, label) => '<a class="nav-link' + ((hash === '#/' ? route === '#/' || route === '' : route.startsWith(hash)) ? ' active' : '') + '" href="' + hash + '">' + label + '</a>';
     $('#sidebar').innerHTML =
       '<a class="brand" href="#/"><span class="logo">&gt;_</span><span>Ace<br><b>Computer Science</b></span></a>' +
-      '<div class="overall"><div class="bar"><i style="width:' + overall + '%"></i></div><span>' + overall + '% complete</span></div>' +
+      '<div class="overall" id="levelBox"></div>' +
       '<div class="nav-scroll">' +
-      '<a class="nav-link' + (route === '#/' ? ' active' : '') + '" href="#/">Dashboard</a>' +
-      '<a class="nav-link' + (route.startsWith('#/playground') ? ' active' : '') + '" href="#/playground">Playground</a>' +
+      link('#/', 'Home') + link('#/flashcards', 'Flashcards') + link('#/practice', 'Practice Test') + link('#/games', 'Games') +
+      link('#/glossary', 'Glossary') + link('#/stats', 'Stats') + link('#/playground', 'Playground') +
+      '<div class="nav-heading">Course and labs</div>' +
       CURRICULUM.map((u, i) =>
         '<div class="nav-unit"><div class="nav-unit-title"><span>Unit ' + (i + 1) + '</span>' + esc(u.title) + '</div>' +
         u.lessons.map((l) =>
@@ -111,6 +156,7 @@
         ).join('') + '</div>'
       ).join('') +
       '</div>';
+    renderLevel();
   }
 
   /* ---------- dashboard ---------- */
@@ -127,6 +173,7 @@
       (next
         ? '<a class="btn primary big" href="#/lesson/' + next.id + '">' + (done ? 'Continue' : 'Start') + ': ' + esc(next.title) + ' →</a>'
         : '<div class="banner ok">You have finished every lesson and lab. Try your own ideas in the <a href="#/playground">Playground</a>.</div>') +
+      '<div class="quick"><a class="btn" href="#/flashcards">Study flashcards</a><a class="btn" href="#/practice">Take a practice test</a><a class="btn" href="#/games">Play a game</a></div>' +
       '</div><div class="stats"><div><b>' + overall + '%</b><span>complete</span></div><div><b>' + labsPassed + '/' + LESSONS.length + '</b><span>labs passed</span></div></div></header>' +
       '<div class="units">' +
       CURRICULUM.map((u, i) => {
@@ -153,7 +200,7 @@
     const next = LESSONS[idx + 1];
     $('#main').innerHTML =
       '<article class="page lesson">' +
-      '<div class="crumbs"><a href="#/">Dashboard</a> / Unit ' + lesson.number.split('.')[0] + ': ' + esc(lesson.unit.title) + '</div>' +
+      '<div class="crumbs"><a href="#/">Home</a> / Unit ' + lesson.number.split('.')[0] + ': ' + esc(lesson.unit.title) + '</div>' +
       '<h1><span class="num">' + lesson.number + '</span> ' + esc(lesson.title) + '</h1>' +
       '<div class="meta"><span class="badge ' + lang + '">' + LANG_LABEL[lang] + '</span><span class="muted">' + lesson.minutes + ' min read, then a quiz and a lab</span></div>' +
       '<div class="content">' + lesson.content + '</div>' +
@@ -208,6 +255,7 @@
         if (+btn.dataset.o === q.answer) {
           state[qi] = true;
           save();
+          addXp(10);
           btn.classList.add('correct');
           qEl.classList.add('solved');
           $$('.option', qEl).forEach((b) => (b.disabled = true));
@@ -307,7 +355,7 @@
       renderTests(res.results);
       const allOk = res.results.length === lab.tests.length && res.results.every((r) => r.ok);
       st.attempts++;
-      if (allOk) st.passed = true;
+      if (allOk && !st.passed) { st.passed = true; addXp(50); toast('Lab passed! +50 XP'); }
       save();
       renderBanner();
       renderHints();
@@ -372,18 +420,35 @@
   }
 
   /* ---------- router ---------- */
+  const routes = {};
+  const cleanups = [];
   function route() {
+    while (cleanups.length) { try { cleanups.pop()(); } catch (e) { /* ignore */ } }
     document.body.classList.remove('menu-open');
     const parts = (location.hash || '#/').slice(2).split('/');
-    document.body.dataset.view = parts[0] || 'dashboard';
+    document.body.dataset.view = parts[0] || 'home';
     if (parts[0] === 'lesson') viewLesson(parts[1]);
     else if (parts[0] === 'lab') viewLab(parts[1]);
     else if (parts[0] === 'playground') viewPlayground();
+    else if (routes[parts[0]]) { renderSidebar(); routes[parts[0]](parts); window.scrollTo(0, 0); }
     else viewDashboard();
   }
   window.addEventListener('hashchange', route);
   $('#menuBtn').onclick = () => document.body.classList.toggle('menu-open');
-  route();
+  document.addEventListener('DOMContentLoaded', route);
+
+  /* Shared with study.js */
+  window.Ace = {
+    $, $$, esc, LESSONS, LANG_LABEL, routes, route, addXp, toast, levelInfo, currentStreak, renderSidebar,
+    lessonDone, labDone, quizDone, pct, steps,
+    get progress() { return progress; },
+    save,
+    onLeave: (fn) => cleanups.push(fn),
+    resetAll() {
+      progress = { quiz: {}, labs: {}, playground: {}, cards: {}, tests: [], game: { xp: 0, streak: 0, lastDay: null } };
+      save();
+    },
+  };
 
   /* ---------- developer self-test: run selfTest() in the console ---------- */
   window.selfTest = async function () {
