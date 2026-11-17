@@ -1,0 +1,18 @@
+# Local dev / Claude Code only
+.claude/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / temp
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node (in case tooling is added later)
+node_modules/
+package-lock.json
