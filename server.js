@@ -37,4 +37,12 @@ http
       res.end(data);
     });
   })
-  .listen(PORT, () => console.log(`CS Lab running at http://localhost:${PORT}`));
+  .on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Ace Computer Science is already running at http://localhost:${PORT}`);
+      setTimeout(() => process.exit(0), 2500);
+    } else {
+      throw err;
+    }
+  })
+  .listen(PORT, () => console.log(`Ace Computer Science running at http://localhost:${PORT}`));
