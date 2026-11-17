@@ -48,8 +48,10 @@
     const t = document.createElement('div');
     t.className = 'toast';
     t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2600);
+    let box = $('#toasts');
+    if (!box) { box = document.createElement('div'); box.id = 'toasts'; box.className = 'toasts'; document.body.appendChild(box); }
+    box.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
   }
   function addXp(amount) {
     const g = progress.game;
@@ -65,6 +67,7 @@
     const after = levelInfo(g.xp).level;
     if (after > before) toast('Level up! You reached level ' + after);
     renderLevel();
+    if (window.Ace && window.Ace.onXp) window.Ace.onXp();
   }
   function renderLevel() {
     const el = $('#levelBox');

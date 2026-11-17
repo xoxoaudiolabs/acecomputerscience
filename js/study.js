@@ -25,6 +25,70 @@
   const inDomain = (list, d) => (d === 'all' ? list : list.filter((x) => x.domain === d));
   const knownCount = (d) => inDomain(FLASHCARDS, d).filter((c) => P().cards[c.term] === 'known').length;
 
+  /* ================= Games list and achievements ================= */
+  const GAMES = [
+    { key: 'match', icon: '🧩', title: 'Match-up', desc: 'Pair 6 terms with their definitions. Fast and satisfying.' },
+    { key: 'speed', icon: '⚡', title: 'Speed Round', desc: '15 definitions, 10 seconds each. Build a combo for bonus XP.' },
+    { key: 'conn', icon: '🔗', title: 'Connections', desc: '16 terms in a grid. Sort them into 4 hidden domains.' },
+    { key: 'jeop', icon: '💰', title: 'Quiz Board', desc: '6 categories × 5 clues. Pick the right term, and watch for the Double.' },
+    { key: 'drill', icon: '📝', title: 'Definition Drill', desc: '15 definitions. Type the matching term from memory.' },
+    { key: 'typing', icon: '⌨️', title: 'Typing Test', desc: 'Type a passage of computer science text. Live WPM and accuracy.' },
+  ];
+
+  const labsIn = (lang) => A.LESSONS.filter((l) => l.unit.lang === lang);
+  const ACHIEVEMENTS = [
+    { id: 'first-xp', icon: '🌱', title: 'First steps', desc: 'Earn your first XP.', test: (s) => s.xp > 0 },
+    { id: 'lab-1', icon: '🧪', title: 'It runs!', desc: 'Pass your first coding lab.', test: (s) => s.labs >= 1 },
+    { id: 'lab-python', icon: '🐍', title: 'Pythonista', desc: 'Pass every Python lab.', test: () => labsIn('python').every(A.labDone) },
+    { id: 'lab-js', icon: '🌐', title: 'Bilingual', desc: 'Pass every JavaScript lab.', test: () => labsIn('javascript').every(A.labDone) },
+    { id: 'lab-sql', icon: '🗄️', title: 'Query master', desc: 'Pass every SQL lab.', test: () => labsIn('sql').every(A.labDone) },
+    { id: 'lab-all', icon: '🎓', title: 'Graduate', desc: 'Complete every lesson, quiz and lab.', test: () => A.LESSONS.every(A.lessonDone) },
+    { id: 'cards-25', icon: '🃏', title: 'Card shark', desc: 'Mark 25 flashcards as known.', test: (s) => s.known >= 25 },
+    { id: 'cards-all', icon: '📚', title: 'Walking glossary', desc: 'Mark every flashcard as known.', test: (s) => s.known >= FLASHCARDS.length },
+    { id: 'test-1', icon: '📝', title: 'Test taker', desc: 'Finish a practice test.', test: (s) => s.tests.length >= 1 },
+    { id: 'test-perfect', icon: '💯', title: 'Flawless', desc: 'Score 100% on a test of 10 or more questions.', test: (s) => s.tests.some((t) => t.score === 100 && t.total >= 10) },
+    { id: 'streak-3', icon: '🔥', title: 'On a roll', desc: 'Study 3 days in a row.', test: (s) => s.streak >= 3 },
+    { id: 'streak-7', icon: '🚀', title: 'Unstoppable', desc: 'Study 7 days in a row.', test: (s) => s.streak >= 7 },
+    { id: 'level-5', icon: '⭐', title: 'High five', desc: 'Reach level 5.', test: (s) => s.level >= 5 },
+    { id: 'gamer', icon: '🎮', title: 'Game night', desc: 'Play all six study games.', test: (s) => GAMES.every((g) => s.plays[g.key]) },
+    { id: 'typist', icon: '⌨️', title: 'Fast fingers', desc: 'Reach 40 WPM in the Typing Test.', test: (s) => s.bestWpm >= 40 },
+  ];
+  function checkAchievements() {
+    const p = P();
+    p.achievements = p.achievements || {};
+    const s = {
+      xp: p.game.xp,
+      level: A.levelInfo(p.game.xp).level,
+      streak: A.currentStreak(),
+      labs: A.LESSONS.filter(A.labDone).length,
+      known: knownCount('all'),
+      tests: p.tests,
+      plays: p.game.plays || {},
+      bestWpm: p.game.bestWpm || 0,
+    };
+    let changed = false;
+    ACHIEVEMENTS.forEach((a) => {
+      if (!p.achievements[a.id] && a.test(s)) {
+        p.achievements[a.id] = Date.now();
+        changed = true;
+        A.toast('🏆 Achievement: ' + a.title);
+      }
+    });
+    if (changed) A.save();
+  }
+  A.onXp = () => setTimeout(checkAchievements, 0);
+
+  /* Extra answers accepted by the Definition Drill. */
+  const ALIASES = {
+    'Big-O notation': ['big o', 'big-o'], 'if statement': ['if'], 'Function call': ['call', 'calling'], 'Return value': ['return'],
+    'Strict equality': ['===', 'triple equals'], 'Integer division': ['floor division', '//'], Modulo: ['modulus', 'mod', 'remainder', '%'],
+    Integer: ['int'], String: ['str'], Boolean: ['bool'], Dictionary: ['dict'], 'while loop': ['while'], 'for loop': ['for'],
+    'Operating system': ['os'], Length: ['len'], 'Aggregate function': ['aggregate'], 'Comparison operator': ['comparison'],
+    'Logical operator': ['logical', 'boolean operator'], 'O(n²)': ['o(n^2)', 'n squared', 'quadratic'], 'O(1)': ['constant'],
+    'O(n)': ['linear'], 'O(log n)': ['logarithmic', 'log n'], Append: ['append()'], 'console.log': ['console log'],
+    'for...of': ['for of'], 'Data type': ['type'], 'Syntax error': ['syntax'], 'Nested list': ['2d list'],
+  };
+
   /* ================= Flashcards ================= */
   A.routes.flashcards = function () {
     let deck = [];
@@ -185,6 +249,7 @@
       P().tests.unshift({ date: Date.now(), score, correct, total, domain: t.domain, mode: t.mode });
       P().tests = P().tests.slice(0, 20);
       A.save();
+      checkAchievements();
       const byDomain = {};
       t.qs.forEach((q, i) => {
         const d = (byDomain[q.domain] = byDomain[q.domain] || { n: 0, ok: 0 });
@@ -248,18 +313,22 @@
       main().innerHTML =
         '<div class="page study"><h1>Study games</h1><p class="muted">Active recall in different shapes. Every game awards XP and counts towards your streak.</p>' +
         '<div class="controls"><label>Pull from domain ' + domainSelect('gmDomain', 'All domains') + '</label></div>' +
-        '<div class="units"><button class="unit-card game-card" id="gmMatch"><span class="game-icon">🧩</span><h2>Match-up</h2><p class="muted">Pair 6 terms with their definitions. Fast and satisfying.</p></button>' +
-        '<button class="unit-card game-card" id="gmSpeed"><span class="game-icon">⚡</span><h2>Speed Round</h2><p class="muted">15 definitions, 10 seconds each. Build a combo for bonus XP.</p></button></div></div>';
+        '<div class="units">' + GAMES.map((g) => '<button class="unit-card game-card" data-game="' + g.key + '"><span class="game-icon">' + g.icon + '</span><h2>' + g.title + '</h2><p class="muted">' + g.desc + '</p></button>').join('') + '</div></div>';
       $('#gmDomain').value = domain;
       $('#gmDomain').onchange = (e) => (domain = e.target.value);
-      $('#gmMatch').onclick = matchUp;
-      $('#gmSpeed').onclick = speedRound;
+      const launch = { match: matchUp, speed: speedRound, conn: connections, jeop: jeopardy, drill: drill, typing: typingSetup };
+      $$('.game-card').forEach((b) => (b.onclick = launch[b.dataset.game]));
     }
 
-    function results(title, lines, xp, replay) {
+    function results(key, title, lines, xp, replay, extra) {
       clearInterval(timer);
+      const g = P().game;
+      g.plays = g.plays || {};
+      g.plays[key] = (g.plays[key] || 0) + 1;
+      A.save();
+      checkAchievements();
       main().innerHTML = '<div class="page study"><h1>' + title + '</h1><div class="result-hero"><div class="result-pct good">+' + xp + '</div><div class="muted">XP earned</div></div>' +
-        '<div class="tiles">' + lines.map((l) => '<div><b>' + l[0] + '</b><span>' + l[1] + '</span></div>').join('') + '</div>' +
+        '<div class="tiles">' + lines.map((l) => '<div><b>' + l[0] + '</b><span>' + l[1] + '</span></div>').join('') + '</div>' + (extra || '') +
         '<div class="pager"><button id="gmAgain" class="btn primary">Play again</button><button id="gmBack" class="btn">Back to games</button></div></div>';
       $('#gmAgain').onclick = replay;
       $('#gmBack').onclick = hub;
@@ -291,7 +360,7 @@
           if (matched === cards.length) {
             const bonus = 25 + (mistakes === 0 ? 50 : 0);
             A.addXp(bonus);
-            results('Match-up complete', [[fmtTime((Date.now() - began) / 1000), 'time'], [mistakes, 'mistakes']], xp + bonus, matchUp);
+            results('match', 'Match-up complete', [[fmtTime((Date.now() - began) / 1000), 'time'], [mistakes, 'mistakes']], xp + bonus, matchUp);
           }
         } else {
           mistakes++;
@@ -341,7 +410,7 @@
       function end() {
         const bonus = 25 + (correct === qs.length ? 100 : 0);
         A.addXp(bonus);
-        results('Speed Round complete', [[correct + '/' + qs.length, 'correct'], ['×' + best, 'best combo']], xp + bonus, speedRound);
+        results('speed', 'Speed Round complete', [[correct + '/' + qs.length, 'correct'], ['×' + best, 'best combo']], xp + bonus, speedRound);
       }
       timer = setInterval(() => {
         if (locked) return;
@@ -351,6 +420,254 @@
         if (left <= 0) answer(null, qs[i]);
       }, 100);
       show();
+    }
+
+    /* ----- Connections ----- */
+    function connections() {
+      const groups = shuffle(Object.keys(DOMAINS)).slice(0, 4).map((d) => ({ d, terms: shuffle(inDomain(FLASHCARDS, d)).slice(0, 4).map((c) => c.term) }));
+      let tiles = shuffle(groups.reduce((all, g) => all.concat(g.terms.map((t) => ({ t, d: g.d }))), []));
+      let picked = [];
+      const solved = [];
+      let left = 4, xp = 0;
+      const groupHTML = (g) => '<div class="cn-group" style="--c:' + DOMAINS[g.d].color + '"><b>' + esc(DOMAINS[g.d].label) + '</b><span>' + g.terms.map(esc).join(' · ') + '</span></div>';
+      main().innerHTML = '<div class="page study"><div class="pt-head"><b>🔗 Connections</b><span id="cnLeft" class="muted"></span><span class="spacer"></span><button id="gmQuit" class="btn small ghost">Quit</button></div>' +
+        '<p class="muted small">Find four groups of four terms that belong to the same domain. Select four tiles, then Submit.</p>' +
+        '<div id="cnSolved"></div><div id="cnGrid" class="cn-grid"></div>' +
+        '<div class="controls"><button id="cnShuffle" class="btn small">Shuffle</button><button id="cnClear" class="btn small ghost">Deselect all</button><button id="cnSubmit" class="btn small primary">Submit</button><span id="cnMsg" class="muted"></span></div></div>';
+      $('#gmQuit').onclick = hub;
+      function draw() {
+        $('#cnLeft').textContent = 'Mistakes left: ' + left;
+        $('#cnSolved').innerHTML = solved.map(groupHTML).join('');
+        $('#cnGrid').innerHTML = tiles.map((x) => '<button class="tile cn' + (picked.includes(x.t) ? ' picked' : '') + '" data-t="' + esc(x.t) + '">' + esc(x.t) + '</button>').join('');
+        $('#cnSubmit').disabled = picked.length !== 4;
+        $$('#cnGrid .tile').forEach((b) => (b.onclick = () => {
+          const t = b.dataset.t;
+          if (picked.includes(t)) picked = picked.filter((p) => p !== t);
+          else if (picked.length < 4) picked.push(t);
+          draw();
+        }));
+      }
+      function end(win) {
+        const bonus = win ? 50 + (left === 4 ? 50 : 0) : 0;
+        if (bonus) A.addXp(bonus);
+        results('conn', win ? 'Connections solved' : 'Out of guesses', [[solved.length + '/4', 'groups found'], [4 - left, 'mistakes']], xp + bonus, connections,
+          '<h2 class="section">The groups</h2>' + groups.map(groupHTML).join(''));
+      }
+      $('#cnShuffle').onclick = () => { tiles = shuffle(tiles); draw(); };
+      $('#cnClear').onclick = () => { picked = []; draw(); };
+      $('#cnSubmit').onclick = () => {
+        if (picked.length !== 4) return;
+        const counts = {};
+        picked.forEach((t) => { const d = tiles.find((x) => x.t === t).d; counts[d] = (counts[d] || 0) + 1; });
+        const best = Math.max.apply(null, Object.values(counts));
+        if (best === 4) {
+          const d = Object.keys(counts)[0];
+          solved.push(groups.find((g) => g.d === d));
+          tiles = tiles.filter((x) => x.d !== d);
+          picked = [];
+          xp += 25;
+          A.addXp(25);
+          $('#cnMsg').textContent = 'Correct!';
+          if (!tiles.length) return end(true);
+        } else {
+          left--;
+          $('#cnMsg').textContent = best === 3 ? 'One away!' : 'Those do not all belong together.';
+          if (left === 0) return end(false);
+        }
+        draw();
+      };
+      draw();
+    }
+
+    /* ----- Quiz Board ----- */
+    function jeopardy() {
+      const VALUES = [200, 400, 600, 800, 1000];
+      const cats = shuffle(Object.keys(DOMAINS)).slice(0, 6);
+      const board = cats.map((d) => shuffle(inDomain(FLASHCARDS, d)).slice(0, 5));
+      const total = cats.length * VALUES.length;
+      const double = Math.floor(Math.random() * total);
+      const used = {};
+      let done = 0, score = 0, correct = 0, xp = 0;
+      const money = (n) => (n < 0 ? '-$' + -n : '$' + n);
+      const head = () => '<div class="pt-head"><b>💰 Quiz Board</b><span class="muted">' + (total - done) + ' clues left</span><span class="clock">' + money(score) + '</span><span class="spacer"></span><button id="gmQuit" class="btn small ghost">Quit</button></div>';
+
+      function drawBoard() {
+        if (done === total) {
+          const bonus = 50 + (correct === total ? 200 : 0);
+          A.addXp(bonus);
+          return results('jeop', 'Board cleared', [[money(score), 'final score'], [correct + '/' + total, 'correct']], xp + bonus, jeopardy);
+        }
+        let cells = cats.map((d) => '<div class="jp-cat" style="--c:' + DOMAINS[d].color + '">' + esc(DOMAINS[d].label) + '</div>').join('');
+        VALUES.forEach((v, r) => cats.forEach((d, c) => {
+          const k = c * VALUES.length + r;
+          cells += '<button class="jp-cell" data-k="' + k + '"' + (used[k] ? ' disabled' : '') + '>' + (used[k] ? '' : '$' + v) + '</button>';
+        }));
+        main().innerHTML = '<div class="page study wide">' + head() + '<div class="jp-scroll"><div class="jp-board">' + cells + '</div></div></div>';
+        $('#gmQuit').onclick = hub;
+        $$('.jp-cell').forEach((b) => (b.onclick = () => open(+b.dataset.k)));
+      }
+
+      function open(k) {
+        const c = Math.floor(k / VALUES.length);
+        const r = k % VALUES.length;
+        if (k !== double) return clue(k, board[c][r], VALUES[r]);
+        const max = Math.max(1000, score);
+        const wagers = [200, 500, 1000, max].filter((w, i, a) => w <= max && a.indexOf(w) === i);
+        main().innerHTML = '<div class="page study">' + head() + '<div class="panel center"><h2>DOUBLE!</h2><p>Category: <b>' + esc(DOMAINS[cats[c]].label) + '</b></p>' +
+          '<p class="muted">Wager any of these amounts. Your current score is ' + money(score) + ' and the most you can wager is $' + max + '.</p>' +
+          '<div class="fc-actions">' + wagers.map((w) => '<button class="btn primary" data-w="' + w + '">$' + w + '</button>').join('') + '</div></div></div>';
+        $('#gmQuit').onclick = hub;
+        $$('[data-w]').forEach((b) => (b.onclick = () => clue(k, board[c][r], +b.dataset.w)));
+      }
+
+      function clue(k, card, value) {
+        const choices = shuffle([card].concat(shuffle(inDomain(FLASHCARDS, card.domain).filter((x) => x.term !== card.term)).slice(0, 3)));
+        main().innerHTML = '<div class="page study">' + head() + '<div class="question">' + domTag(card.domain) + ' <b>$' + value + '</b><div class="q-text big">' + esc(card.def) + '</div><div class="options two">' +
+          choices.map((x) => '<button class="option" data-t="' + esc(x.term) + '">' + esc(x.term) + '</button>').join('') + '</div><div id="jpAfter"></div></div></div>';
+        $('#gmQuit').onclick = hub;
+        $$('.option').forEach((b) => (b.onclick = () => {
+          const ok = b.dataset.t === card.term;
+          $$('.option').forEach((o) => { o.disabled = true; if (o.dataset.t === card.term) o.classList.add('correct'); });
+          if (!ok) b.classList.add('wrong');
+          used[k] = true;
+          done++;
+          score += ok ? value : -value;
+          if (ok) { correct++; const gain = Math.round(value / 40); xp += gain; A.addXp(gain); }
+          $('#jpAfter').innerHTML = '<div class="explain"><b>' + (ok ? 'Correct, +$' + value : 'Not quite, -$' + value) + '.</b> Score: ' + money(score) + '</div><div class="pager"><span></span><button id="jpNext" class="btn primary">Continue</button></div>';
+          $('#jpNext').onclick = drawBoard;
+          $('#jpNext').focus();
+        }));
+      }
+      drawBoard();
+    }
+
+    /* ----- Definition Drill ----- */
+    function drill() {
+      const qs = shuffle(inDomain(FLASHCARDS, domain)).slice(0, 15);
+      const began = Date.now();
+      const norm = (v) => v.toLowerCase().replace(/²/g, '2').replace(/[^a-z0-9]/g, '');
+      const accepts = (c, v) => [c.term].concat(ALIASES[c.term] || []).some((a) => a.toLowerCase() === v.trim().toLowerCase() || (norm(a) && norm(a) === norm(v)));
+      let i = 0, correct = 0, xp = 0, hinted = false, locked = false;
+      main().innerHTML = '<div class="page study"><div class="pt-head"><b>📝 Definition Drill</b><span id="ddPos" class="muted"></span><span class="spacer"></span><span id="ddClock" class="clock">0:00</span><button id="gmQuit" class="btn small ghost">Quit</button></div>' +
+        '<div class="question"><div id="ddDom"></div><div id="ddDef" class="q-text big"></div>' +
+        '<div class="controls"><input id="ddInput" type="search" placeholder="Type the term…" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+        '<button id="ddSubmit" class="btn primary">Submit</button><button id="ddHint" class="btn">Hint</button><button id="ddSkip" class="btn ghost">Skip →</button></div><div id="ddMsg" class="explain"></div></div></div>';
+      timer = setInterval(() => ($('#ddClock').textContent = fmtTime((Date.now() - began) / 1000)), 500);
+      $('#gmQuit').onclick = hub;
+      function show() {
+        hinted = false;
+        locked = false;
+        $('#ddPos').textContent = i + 1 + ' / ' + qs.length;
+        $('#ddDom').innerHTML = domTag(qs[i].domain);
+        $('#ddDef').textContent = qs[i].def;
+        $('#ddMsg').textContent = '';
+        $('#ddInput').value = '';
+        $('#ddInput').focus();
+      }
+      function next(delay) {
+        locked = true;
+        setTimeout(() => {
+          if (!$('#ddInput')) return;
+          i++;
+          if (i < qs.length) return show();
+          A.addXp(25);
+          results('drill', 'Drill complete', [[correct + '/' + qs.length, 'correct'], [fmtTime((Date.now() - began) / 1000), 'time']], xp + 25, drill);
+        }, delay);
+      }
+      function submit() {
+        const v = $('#ddInput').value;
+        if (locked || !v.trim()) return;
+        if (accepts(qs[i], v)) {
+          correct++;
+          const gain = hinted ? 5 : 10;
+          xp += gain;
+          A.addXp(gain);
+          $('#ddMsg').innerHTML = '<b style="color:var(--ok)">Correct: ' + esc(qs[i].term) + '</b>';
+          next(700);
+        } else {
+          $('#ddMsg').textContent = 'Not quite. Try again, ask for a hint, or skip.';
+        }
+      }
+      $('#ddSubmit').onclick = submit;
+      $('#ddInput').onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+      $('#ddHint').onclick = () => {
+        if (locked) return;
+        hinted = true;
+        const t = qs[i].term;
+        $('#ddMsg').textContent = 'Hint: it starts with "' + t.slice(0, 2) + '" and is ' + t.length + ' characters long.';
+        $('#ddInput').focus();
+      };
+      $('#ddSkip').onclick = () => {
+        if (locked) return;
+        $('#ddMsg').innerHTML = 'The answer was <b>' + esc(qs[i].term) + '</b>.';
+        next(1600);
+      };
+      show();
+    }
+
+    /* ----- Typing Test ----- */
+    function typingSetup() {
+      clearInterval(timer);
+      main().innerHTML = '<div class="page study"><div class="pt-head"><b>⌨️ Typing Test</b><span class="spacer"></span><button id="gmQuit" class="btn small ghost">Back</button></div>' +
+        '<div class="panel"><h3>Pick your length</h3><div class="fc-actions" style="justify-content:flex-start">' +
+        '<button class="btn" data-n="40"><b>Short</b>&nbsp; about 40 words</button><button class="btn" data-n="100"><b>Medium</b>&nbsp; about 100 words</button><button class="btn" data-n="200"><b>Long</b>&nbsp; about 200 words</button></div>' +
+        '<p class="muted small">Passages are built from the flashcard definitions, so you revise the material as you type.</p></div></div>';
+      $('#gmQuit').onclick = hub;
+      $$('[data-n]').forEach((b) => (b.onclick = () => typing(+b.dataset.n)));
+    }
+
+    function typing(words) {
+      clearInterval(timer);
+      const plain = inDomain(FLASHCARDS, domain).filter((c) => /^[\x20-\x7E]+$/.test(c.term + c.def));
+      let text = '';
+      shuffle(plain).some((c) => {
+        text += (text ? ' ' : '') + c.term + ': ' + c.def;
+        return text.split(' ').length >= words;
+      });
+      let started = 0, strokes = 0, errors = 0, prev = 0, finished = false;
+      main().innerHTML = '<div class="page study"><div class="pt-head"><b>⌨️ Typing Test</b><span id="tyWpm" class="muted">WPM: 0</span><span id="tyAcc" class="muted">Accuracy: 100%</span><span class="spacer"></span><span id="tyClock" class="clock">0:00</span><button id="gmQuit" class="btn small ghost">Quit</button></div>' +
+        '<div id="tyPass" class="passage">' + text.split('').map((ch) => '<span>' + esc(ch) + '</span>').join('') + '</div>' +
+        '<textarea id="tyIn" class="ty-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type the passage shown above"></textarea>' +
+        '<div class="controls"><span class="muted small">Click the passage and start typing. Backspace works.</span><span class="spacer"></span><button id="tyRestart" class="btn small">New passage</button></div></div>';
+      const spans = $$('#tyPass span');
+      const input = $('#tyIn');
+      const minutes = () => Math.max((Date.now() - started) / 60000, 1 / 600);
+      const stats = (v) => {
+        let right = 0;
+        for (let j = 0; j < v.length; j++) if (v[j] === text[j]) right++;
+        return { wpm: started ? Math.round(right / 5 / minutes()) : 0, acc: strokes ? Math.round(((strokes - errors) / strokes) * 100) : 100 };
+      };
+      function paint(v) {
+        spans.forEach((sp, j) => (sp.className = j < v.length ? (v[j] === text[j] ? 'ok' : 'no') : j === v.length ? 'cur' : ''));
+        const s = stats(v);
+        $('#tyWpm').textContent = 'WPM: ' + s.wpm;
+        $('#tyAcc').textContent = 'Accuracy: ' + s.acc + '%';
+      }
+      input.oninput = () => {
+        if (finished) return;
+        let v = input.value.replace(/\n/g, ' ').slice(0, text.length);
+        if (v !== input.value) input.value = v;
+        if (!started && v.length) started = Date.now();
+        for (let j = prev; j < v.length; j++) { strokes++; if (v[j] !== text[j]) errors++; }
+        prev = v.length;
+        paint(v);
+        if (v.length >= text.length) {
+          finished = true;
+          const s = stats(v);
+          const gain = 25 + Math.min(150, Math.round(s.wpm * 1.5)) + Math.round(s.acc / 5) + (errors === 0 ? 50 : 0);
+          const g = P().game;
+          g.bestWpm = Math.max(g.bestWpm || 0, s.wpm);
+          A.addXp(gain);
+          results('typing', 'Typing Test complete', [[s.wpm, 'words per minute'], [s.acc + '%', 'accuracy'], [fmtTime((Date.now() - started) / 1000), 'time'], [g.bestWpm, 'your best WPM']], gain, typingSetup);
+        }
+      };
+      input.onpaste = (e) => e.preventDefault();
+      $('#tyPass').onclick = () => input.focus();
+      $('#tyRestart').onclick = () => typing(words);
+      $('#gmQuit').onclick = hub;
+      timer = setInterval(() => { if (started && !finished) { $('#tyClock').textContent = fmtTime((Date.now() - started) / 1000); paint(input.value); } }, 500);
+      paint('');
+      input.focus();
     }
   };
 
@@ -374,6 +691,8 @@
         const k = knownCount(d);
         return '<div class="mastery"><span>' + esc(DOMAINS[d].label) + '</span><div class="bar"><i style="width:' + (k / total) * 100 + '%;background:' + DOMAINS[d].color + '"></i></div><span class="muted small">' + k + '/' + total + '</span></div>';
       }).join('') +
+      '<h2 class="section">Achievements <span class="muted small">' + Object.keys(p.achievements || {}).length + ' of ' + ACHIEVEMENTS.length + '</span></h2><div class="ach-grid">' +
+      ACHIEVEMENTS.map((a) => { const got = (p.achievements || {})[a.id]; return '<div class="ach' + (got ? ' got' : '') + '"><span class="ach-icon">' + (got ? a.icon : '🔒') + '</span><div><b>' + esc(a.title) + '</b><div class="muted small">' + esc(a.desc) + '</div></div></div>'; }).join('') + '</div>' +
       '<h2 class="section">Recent test history</h2>' +
       (tests.length ? '<div class="result-table"><table><tr><th>Date</th><th>Scope</th><th>Mode</th><th>Score</th></tr>' +
         tests.map((t) => '<tr><td>' + new Date(t.date).toLocaleDateString() + '</td><td>' + esc(t.domain === 'all' ? 'All domains' : DOMAINS[t.domain].label) + '</td><td>' + esc(t.mode) + '</td><td>' + t.correct + '/' + t.total + ' (' + t.score + '%)</td></tr>').join('') + '</table></div>'

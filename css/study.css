@@ -5,10 +5,10 @@
 .bar.xp i { background: var(--accent); }
 .nav-heading { margin: 18px 10px 0; padding-top: 14px; border-top: 1px solid var(--border); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .nav-heading + .nav-unit { margin-top: 10px; }
+.toasts { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast {
-  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100;
   background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: 99px; font-weight: 600; font-size: .92rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, .25); animation: toast 2.6s forwards;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .25); animation: toast 3s forwards; white-space: nowrap;
 }
 @keyframes toast { 0% { opacity: 0; translate: 0 12px; } 10%, 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
 .quick { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -97,4 +97,37 @@ div.option { cursor: default; }
   .match { grid-template-columns: 1fr; }
   .fc-text.term { font-size: 1.5rem; }
   .mastery { grid-template-columns: 1fr 1fr 44px; }
+}
+
+/* ---------- connections ---------- */
+.cn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tile.cn { text-align: center; font-weight: 600; min-height: 72px; overflow-wrap: anywhere; }
+.cn-group { border: 1px solid var(--c); border-left-width: 6px; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; background: var(--panel); }
+.cn-group b { display: block; color: var(--c); font-size: .85rem; }
+.cn-group span { font-size: .92rem; }
+
+/* ---------- quiz board ---------- */
+.jp-scroll { overflow-x: auto; }
+.jp-board { display: grid; grid-template-columns: repeat(6, minmax(104px, 1fr)); gap: 8px; min-width: 660px; }
+.jp-cat { display: grid; place-items: center; text-align: center; padding: 10px 6px; border-radius: 10px; font-size: .8rem; font-weight: 700; color: var(--c); border: 1px solid var(--c); background: var(--panel); min-height: 64px; }
+.jp-cell { min-height: 64px; border-radius: 10px; border: 1px solid var(--border); background: var(--accent-soft); color: var(--accent); font: 800 1.15rem inherit; cursor: pointer; }
+.jp-cell:hover:not(:disabled) { border-color: var(--accent); }
+.jp-cell:disabled { background: var(--panel-2); cursor: default; }
+
+/* ---------- typing test ---------- */
+.passage { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; font: 1.1rem/1.9 Consolas, "Cascadia Code", monospace; cursor: text; color: var(--muted); overflow-wrap: anywhere; }
+.passage .ok { color: var(--text); }
+.passage .no { color: var(--bad); background: var(--bad-soft); border-radius: 2px; }
+.passage .cur { border-left: 2px solid var(--accent); margin-left: -2px; }
+.ty-input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+
+/* ---------- achievements ---------- */
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.ach { display: flex; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; opacity: .55; }
+.ach.got { opacity: 1; border-color: var(--ok); }
+.ach-icon { font-size: 1.6rem; }
+
+@media (max-width: 600px) {
+  .cn-grid { gap: 6px; }
+  .tile.cn { padding: 8px 4px; font-size: .8rem; }
 }
